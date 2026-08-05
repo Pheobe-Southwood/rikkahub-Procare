@@ -2,16 +2,16 @@ package me.rerere.rikkahub.data.ai.transformers
 
 import io.pebbletemplates.pebble.PebbleEngine
 import io.pebbletemplates.pebble.loader.Loader
-import kotlinx.datetime.toJavaLocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import me.rerere.ai.core.MessageRole
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.data.datastore.SettingsStore
-import me.rerere.rikkahub.utils.toLocalDateString
-import me.rerere.rikkahub.utils.toLocalTimeString
 import java.io.Reader
 import java.io.StringReader
 import java.io.StringWriter
+import kotlin.time.toJavaInstant
 
 class TemplateTransformer(
     private val engine: PebbleEngine,
@@ -22,6 +22,7 @@ class TemplateTransformer(
         messages: List<UIMessage>,
     ): List<UIMessage> {
         val template = engine.getTemplate(ctx.assistant.id.toString())
+        val timeZone = TimeZone.currentSystemDefault()
         return messages.map { message ->
             // system / tool 等非用户/助手消息：不套用模板，原样返回。
             // 这些消息的 createdAt 每次请求都不同，若套模板并注入时间戳会导致最前缀缓存失效；
@@ -30,9 +31,8 @@ class TemplateTransformer(
                 return@map message
             }
 
-            // 用户/助手消息：使用消息自身的创建时间（历史时间戳），而非当前请求时刻。
-            // 这样历史消息渲染结果跨请求保持稳定，避免破坏各 Provider 的前缀 prompt 缓存。
-            val createdAt = message.createdAt.toJavaLocalDateTime()
+            // 使用消息本身的发送时间而不是当前时间, 保证多次请求时渲染结果稳定, 不破坏 prompt 缓存
+            val createdAt = message.createdAt.toInstant(timeZone).toJavaInstant()
             message.copy(
                 parts = message.parts.map { part ->
                     when (part) {
@@ -42,8 +42,8 @@ class TemplateTransformer(
                                 result, mapOf(
                                     "message" to part.text,
                                     "role" to message.role.name.lowercase(),
-                                    "time" to createdAt.toLocalTimeString(),
-                                    "date" to createdAt.toLocalDateString(),
+                                    "time" to createdAt.toLocalTime(),
+                                    "date" to createdAt.toLocalDate(),
                                 )
                             )
                             part.copy(
