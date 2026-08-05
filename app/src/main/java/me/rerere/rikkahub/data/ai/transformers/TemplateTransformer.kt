@@ -8,6 +8,8 @@ import me.rerere.ai.core.MessageRole
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.data.datastore.SettingsStore
+import me.rerere.rikkahub.utils.toLocalDate
+import me.rerere.rikkahub.utils.toLocalTime
 import java.io.Reader
 import java.io.StringReader
 import java.io.StringWriter
