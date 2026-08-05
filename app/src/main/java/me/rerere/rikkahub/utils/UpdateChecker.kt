@@ -17,7 +17,8 @@ import me.rerere.rikkahub.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-private const val API_URL = "https://updates.rikka-ai.com/"
+private const val API_URL =
+    "https://api.github.com/repos/Pheobe-Southwood/rikkahub-Procare/releases/latest"
 
 class UpdateChecker(private val client: OkHttpClient) {
     private val json = Json { ignoreUnknownKeys = true }
@@ -38,7 +39,21 @@ class UpdateChecker(private val client: OkHttpClient) {
                             .build()
                     ).await()
                     if (response.isSuccessful) {
-                        json.decodeFromString<UpdateInfo>(response.body.string())
+                        val release = json.decodeFromString<GithubRelease>(response.body.string())
+                        UpdateInfo(
+                            version = release.tag_name.removePrefix("v"),
+                            publishedAt = release.published_at,
+                            changelog = release.body.orEmpty(),
+                            downloads = release.assets
+                                .filter { it.name.endsWith(".apk") }
+                                .map {
+                                    UpdateDownload(
+                                        name = it.name,
+                                        url = it.browser_download_url,
+                                        size = formatSize(it.size)
+                                    )
+                                }
+                        )
                     } else {
                         throw Exception("Failed to fetch update info")
                     }
@@ -91,6 +106,28 @@ data class UpdateInfo(
     val changelog: String,
     val downloads: List<UpdateDownload>
 )
+
+@Serializable
+data class GithubRelease(
+    val tag_name: String,
+    val published_at: String,
+    val body: String? = null,
+    val assets: List<GithubReleaseAsset> = emptyList()
+)
+
+@Serializable
+data class GithubReleaseAsset(
+    val name: String,
+    val browser_download_url: String,
+    val size: Long
+)
+
+private fun formatSize(bytes: Long): String {
+    if (bytes <= 0) return "0 B"
+    val kb = bytes / 1024.0
+    val mb = kb / 1024.0
+    return if (mb >= 1) String.format("%.1f MB", mb) else String.format("%.0f KB", kb)
+}
 
 /**
  * 版本号值类，封装版本号字符串并提供比较功能
